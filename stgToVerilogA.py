@@ -224,6 +224,20 @@ class Transition():
         return ans    
 
     #---------------------------------------------------------------------------
+    ## Remove one token from the place 
+    #
+    #  @param self pointer to self
+    #  @return return a command that remove one token from the place
+    #
+    #---------------------------------------------------------------------------
+    def incNextTokens(self):
+        ans = CmdList()
+        for toItem in self.getTo():
+            ans.append(toItem.incNextToken())
+        return ans    
+        
+        
+    #---------------------------------------------------------------------------
     ## get all the tokens from the incomming places
     #  
     #  @param self The object pointer.
@@ -265,12 +279,13 @@ class Place():
     #  @param capacity capacity of the place
     #
     #---------------------------------------------------------------------------
-    def __init__(self, var, name, capacity = 1):
+    def __init__(self, var, inc, name, capacity = 1):
         assertInt(capacity)
         self.capacity = capacity
         self.toTransitions = []
         self.fromTransitions = []
         self.var = var
+        self.inc = inc
         self.name = name
         
     #---------------------------------------------------------------------------
@@ -295,6 +310,17 @@ class Place():
         return self.var.eq(self.var - 1)
 
     #---------------------------------------------------------------------------
+    ## Remove one token from the place 
+    #
+    #  @param self pointer to self
+    #  @return return a command that remove one token from the place
+    #
+    #---------------------------------------------------------------------------
+    def incNextToken(self):
+        return self.inc.eq(self.inc + 1)
+        
+        
+    #---------------------------------------------------------------------------
     ## Put one token into the place 
     #
     #  @param self pointer to self
@@ -303,9 +329,9 @@ class Place():
     #---------------------------------------------------------------------------
     def putToken(self):
         return CmdList(
-            If(self.var < self.capacity)(
-                self.var.eq(self.var + 1)
-            ).Else(
+            self.var.eq(self.var + self.inc),
+            self.inc.eq(0), 
+            If(self.var > self.capacity)(
                 Error(self.name + ' capacity was violated')
             )
         )
@@ -382,21 +408,20 @@ class STG():
         # verilogA module
         #-----------------------------------------------------------------------
         self.mod = HiLevelMod(ast["name"])
-        self.gnd = self.mod.electrical("GND")
-        self.vdd = self.mod.electrical("VDD")
+        self.gnd = self.mod.electrical("GND", direction = "inout")
+        self.vdd = self.mod.electrical("VDD", direction = "inout")
         self.rf  = self.mod.par(1e-9, "RISE_FALL_PAR")
         self.dl  = self.mod.par(1e-9, "DELAY_PAR")
         self.inCap  = self.mod.par(10e-15, "IN_CAP_PAR")
         self.serRes = self.mod.par(100.00, "OUT_RES_PAR")
         self.rst = self.mod.dig(
-                        self.vdd, 
-                        "RST", 
-                        1, 
-                        direction = "input", 
-                        gnd = self.gnd,
-                        inCap = self.inCap,
+                       domain = self.vdd, 
+                       name = "RST", 
+                       direction = "input", 
+                       gnd = self.gnd,
+                       inCap = self.inCap,
                    )
-        self.rstAt = At(Above(-self.rst.diffHalfDomain))()
+        self.rstAt = At( Above(0.05 + self.rst.diffHalfDomain) )()
         self.mod.analog(self.rstAt)
         self.done = self.mod.var(0)
         
@@ -413,19 +438,19 @@ class STG():
                         par = 0
                         if sigType != "input":
                             par = self.mod.par(0, signal + "_RST_VALUE_PAR")
-                        digpin = self.mod.dig(self.vdd, 
-                                              signal,
-                                              1,
-                                              value = par,
-                                              direction = sigMap[sigType],
-                                              delay = self.dl,
-                                              rise = self.rf,
-                                              fall = self.rf,
-                                              gnd = self.gnd,
-                                              inCap = self.inCap,
-                                              serRes = self.serRes
+                        digpin = self.mod.dig(
+                                     domain = self.vdd, 
+                                     name = signal,
+                                     value = par,
+                                     direction = sigMap[sigType],
+                                     delay = self.dl,
+                                     rise = self.rf,
+                                     fall = self.rf,
+                                     gnd = self.gnd,
+                                     inCap = self.inCap,
+                                     serRes = self.serRes
                                  )
-                        if sigType != "input":
+                        if sigMap[sigType] != "input":
                             self.rstAt.append(digpin.write(Bool(par)))
                         if sigMap[sigType] == "internal":
                             self.rstAt.append(digpin.lowZ())
@@ -500,106 +525,111 @@ class STG():
                    toTP.addFrom(fromTP)
                   
         # build stg
-        #-----------------------------------------------------------------------                        
+        #-----------------------------------------------------------------------   
+        cmdOut = CmdList()                     
         for signal in self.signals:
-        
-            # Process input rising edge
+            signalObj = self.signals[signal]
+            
+            # Process signals
             #-------------------------------------------------------------------
-            sigIf = If(self.rst.read())(self.done.eq(0))
+            sigIfRising  = If(self.rst.read())(
+                               self.done.eq(0)
+                           )
+            sigIfFalling = If(self.rst.read())(
+                               self.done.eq(0)
+                           )
             self.mod.analog(
-                At(Cross(self.signals[signal].diffHalfDomain, "rising"))(
-                    sigIf
+                At(Cross(signalObj.diffHalfDomain, "rising"))(
+                    sigIfRising
+                ),
+                At(Cross(signalObj.diffHalfDomain, "falling"))(
+                    sigIfFalling
                 )
             )   
-            for edge in ['+', '~']:  
-                for transition in self.transitions[signal][edge].keys():     
-                    if isinstance(self.signals[signal], hilevelmod.DigIn): 
-                        sigIf.append(True,
-                            If(self.transitions[signal][edge][transition].isEnabled())(
-                                self.transitions[signal][edge][transition].getTokens(),
-                                self.transitions[signal][edge][transition].putTokens(), 
-                                self.done.eq(1)       
-                            ),
-                        )
-                        sigIf.append(True, 
-                            If(self.done == 0)(
-                                Error(transition + " isn't enabled")  
+
+            if not isinstance(signalObj, hilevelmod.DigIn): 
+                for edge in ['+', '-', '~']:  
+                    for transition in self.transitions[signal][edge].keys():     
+                        transitionObj = self.transitions[signal][edge][transition]
+                        if edge == '+':
+                            sigIfRising.append(True,
+                                transitionObj.putTokens(),    
+                            )
+                            cmdOut.append(
+                                If(transitionObj.isEnabled())( 
+                                    transitionObj.getTokens(),
+                                    transitionObj.incNextTokens(),
+                                    signalObj.write(True) 
+                                )  
+                            )
+                        elif edge == '-':
+                            sigIfFalling.append(True,
+                                transitionObj.putTokens(),    
+                            )
+                            cmdOut.append(
+                                If(transitionObj.isEnabled())( 
+                                    transitionObj.getTokens(),
+                                    transitionObj.incNextTokens(),
+                                    signalObj.write(False) 
+                                )  
+                            )
+                        else:
+                            sigIfRising.append(True,
+                                transitionObj.putTokens(),    
+                            )
+                            sigIfFalling.append(True,
+                                transitionObj.putTokens(),    
+                            )
+                            cmdOut.append(
+                                If(transitionObj.isEnabled())( 
+                                    transitionObj.getTokens(),
+                                    transitionObj.incNextTokens(),
+                                    signalObj.toggle(False) 
+                                )  
+                            )
+            else:
+                for edge in ['+', '-', '~']:  
+                    for transition in self.transitions[signal][edge].keys():    
+                        transitionObj = self.transitions[signal][edge][transition] 
+                        if edge in ['+', '~']:
+                            sigIfRising.append(True,
+                                If(transitionObj.isEnabled())(
+                                    transitionObj.getTokens(),
+                                    transitionObj.incNextTokens(),
+                                    transitionObj.putTokens(), 
+                                    self.done.eq(1)       
+                                ),
                             )  
-                        )  
-                    else:
-                        sigIf.append(True,
-                            self.transitions[signal][edge][transition].putTokens(),    
-                        )
-                        
-            # Process input falling edge
-            #-------------------------------------------------------------------
-            sigIf = If(self.rst.read())(self.done.eq(0))
-            self.mod.analog(
-                At(Cross(self.signals[signal].diffHalfDomain, "falling"))(
-                    sigIf
+                        if edge in ['-', '~']:
+                            sigIfFalling.append(True,
+                                If(transitionObj.isEnabled())(
+                                    transitionObj.getTokens(),
+                                    transitionObj.incNextTokens(),
+                                    transitionObj.putTokens(), 
+                                    self.done.eq(1)       
+                                ),
+                            )  
+                sigIfRising.append(True,
+                    If(self.done == 0)(
+                        Error("No transition related to " + \
+                              signal + \
+                              "+ is enabled")  
+                    )  
                 )
-            )   
-            for edge in ['-', '~']:  
-                for transition in self.transitions[signal][edge].keys():     
-                    if isinstance(self.signals[signal], hilevelmod.DigIn): 
-                        sigIf.append(True,
-                            If(self.transitions[signal][edge][transition].isEnabled())(
-                                self.transitions[signal][edge][transition].getTokens(),
-                                self.transitions[signal][edge][transition].putTokens(), 
-                                self.done.eq(1)       
-                            ),
-                        )
-                        sigIf.append(True, 
-                            If(self.done == 0)(
-                                Error(transition + " isn't enabled")  
-                            )  
-                        )  
-                    else:
-                        sigIf.append(True,
-                            self.transitions[signal][edge][transition].putTokens(),    
-                        ) 
-                        
-        # Process outputs
-        #-----------------------------------------------------------------------    
-        cmd = CmdList()
+                sigIfFalling.append(True,
+                    If(self.done == 0)(
+                        Error("No transition related to " + \
+                              signal + \
+                              "- is enabled")  
+                    )  
+                )
         self.mod.analog(
             If(self.rst.read())(
-                self.done.eq(0),  
-                cmd
+                self.done.eq(0),  #dummy for no outputs     
+                cmdOut
             )
-        )                      
-        for signal in self.signals:
-            if not isinstance(self.signals[signal], hilevelmod.DigIn):        
-                # Process output rising edge
-                #---------------------------------------------------------------
-                for transition in self.transitions[signal]['+'].keys():   
-                    cmd.append(
-                        If(self.transitions[signal]['+'][transition].isEnabled())( 
-                            self.transitions[signal]['+'][transition].getTokens(),
-                            self.signals[signal].write(True) 
-                        )  
-                    )
-                    
-                # Process output falling edge
-                #---------------------------------------------------------------
-                for transition in self.transitions[signal]['-'].keys():   
-                    cmd.append(
-                        If(self.transitions[signal]['-'][transition].isEnabled())( 
-                            self.transitions[signal]['-'][transition].getTokens(),
-                            self.signals[signal].write(False) 
-                        )  
-                    )
-                    
-                # Process both edges
-                #---------------------------------------------------------------
-                for transition in self.transitions[signal]['~'].keys():   
-                    cmd.append(
-                        If(self.transitions[signal]['~'][transition].isEnabled())( 
-                            self.transitions[signal]['~'][transition].getTokens(),
-                            self.signals[signal].toggle() 
-                        )  
-                    )
-                                                
+        )
+                        
     #---------------------------------------------------------------------------
     ## match a place with an specific name   
     #  
@@ -618,8 +648,10 @@ class STG():
             if name in self.capacity.keys():
                 capacity = self.capacity[name]
             var = self.mod.var(marking)
+            inc = self.mod.var(0)
             self.rstAt.append(var.eq(marking))
             P = Place(var,
+                      inc,
                       name,
                       capacity)
             self.places[name] = P 
@@ -662,7 +694,8 @@ class STG():
 
 
 #-------------------------------------------------------------------------------
-# Main
+## Main
+#
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
 
@@ -670,12 +703,35 @@ if __name__ == "__main__":
     # Input arguments
     #---------------------------------------------------------------------------
     parser = argparse.ArgumentParser()
-    parser.add_argument('stg', metavar='stg', type=str, nargs=1,
-                         help='.g file containing the description of the stg')
-    parser.add_argument('-o', action='store',
-                              dest='outFile',
-                              default='verilogA.va',
-                              help='output file name')
+    parser.add_argument(
+        'stg', 
+        metavar='stg', 
+        type=str, 
+        nargs=1,
+        help='.g file containing the description of the stg'
+    )
+    parser.add_argument(
+        '-o', 
+        action='store',
+        dest='outFile',
+        default='verilogA.va',
+        help='output file name'
+    )
+    parser.add_argument(
+        '-seeInternals', 
+        action='store_true',
+        default=False,
+        dest='seeInt',
+        help='Internal signals will be converted into in/out ports.'
+    ) 
+    parser.add_argument(
+        '-allInputs', 
+        action='store_true',
+        default=False,
+        dest='allInp',
+        help='Convert all signals into inputs. If seeInternals is enabled, ' +\
+             'internal signals will also be converted to inputs.'
+    )     
     results = parser.parse_args()
 
     #---------------------------------------------------------------------------
@@ -687,7 +743,19 @@ if __name__ == "__main__":
             content = content_file.read()
         #Create stg
         ast = parse(GRAMMAR, content)
-        stg = STG(ast)
+        mapping = {"input"    : "input", 
+                   "output"   : "output",
+                   "internal" : "internal"}
+                            
+        if results.seeInt and (not results.allInp):
+            mapping["internal"] = "output"
+        elif results.seeInt and results.allInp:
+            mapping["internal"] = "input"
+        if results.allInp:
+            mapping["output"] = "input"
+
+        stg = STG(ast, mapping)
+        
         #Open log file
         f = open(results.outFile, "w")
         f.write(stg.getVA())
