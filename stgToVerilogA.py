@@ -34,8 +34,9 @@
 #-------------------------------------------------------------------------------
 import argparse
 import re
-from   vagen import *
-from   grako import parse
+from vagen import If, While, Bool, HiLevelMod, At, \
+                  Above, Cross, CmdList, Fatal, hilevelmod
+from grako import parse
 
 
 #-------------------------------------------------------------------------------
@@ -54,6 +55,7 @@ GRAMMAR = '''
               {input+:inputs        |  
                output+:outputs      | 
                internal+:internals  | 
+               dummy+:dummy         |
                graph+:graph         |
                marking+:marking     |
                capacity+:capacity}* 
@@ -164,11 +166,13 @@ class Transition():
     ## Constructor
     #
     #  @param self pointer to self
+    #  @param var variable representing a ongoing transition
     #
     #---------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, var):
         self.toPlaces = []
         self.fromPlaces = []
+        self.var = var
 
     #---------------------------------------------------------------------------
     ## Add place to the "to" list    
@@ -214,7 +218,7 @@ class Transition():
     ## Is Enabled
     #  
     #  @param self The object pointer.
-    #  @return boolean expression representing place enabled evaulation 
+    #  @return boolean expression representing place enabled evaluation 
     #
     #---------------------------------------------------------------------------
     def isEnabled(self):
@@ -222,20 +226,17 @@ class Transition():
         for fromItem in self.getFrom():
             ans = ans & fromItem.hasToken()
         return ans    
-
-    #---------------------------------------------------------------------------
-    ## Remove one token from the place 
-    #
-    #  @param self pointer to self
-    #  @return return a command that remove one token from the place
-    #
-    #---------------------------------------------------------------------------
-    def incNextTokens(self):
-        ans = CmdList()
-        for toItem in self.getTo():
-            ans.append(toItem.incNextToken())
-        return ans    
         
+    #---------------------------------------------------------------------------
+    ## Is On going
+    #  
+    #  @param self The object pointer.
+    #  @return boolean expression representing an evaluation if the transition
+    #          is on going
+    #
+    #---------------------------------------------------------------------------
+    def isOnGoing(self):
+        return Bool(self.var)
         
     #---------------------------------------------------------------------------
     ## get all the tokens from the incomming places
@@ -245,7 +246,7 @@ class Transition():
     #
     #---------------------------------------------------------------------------
     def getTokens(self):
-        ans = CmdList()
+        ans = CmdList(self.var.eq(1))
         for fromItem in self.getFrom():
             ans.append(fromItem.getToken())
         return ans    
@@ -258,7 +259,22 @@ class Transition():
     #
     #---------------------------------------------------------------------------
     def putTokens(self):
+        ans = CmdList(self.var.eq(0))
+        for toItem in self.getTo():
+            ans.append(toItem.putToken())
+        return ans   
+        
+    #---------------------------------------------------------------------------
+    ## Fire up the transition imediatelly
+    #  
+    #  @param self The object pointer.
+    #  @return a list of commands to fire the transition  
+    #
+    #---------------------------------------------------------------------------
+    def fire(self):
         ans = CmdList()
+        for fromItem in self.getFrom():
+            ans.append(fromItem.getToken())
         for toItem in self.getTo():
             ans.append(toItem.putToken())
         return ans   
@@ -279,13 +295,12 @@ class Place():
     #  @param capacity capacity of the place
     #
     #---------------------------------------------------------------------------
-    def __init__(self, var, inc, name, capacity = 1):
+    def __init__(self, var, name, capacity = 1):
         assertInt(capacity)
         self.capacity = capacity
         self.toTransitions = []
         self.fromTransitions = []
         self.var = var
-        self.inc = inc
         self.name = name
         
     #---------------------------------------------------------------------------
@@ -308,17 +323,6 @@ class Place():
     #---------------------------------------------------------------------------
     def getToken(self):
         return self.var.eq(self.var - 1)
-
-    #---------------------------------------------------------------------------
-    ## Remove one token from the place 
-    #
-    #  @param self pointer to self
-    #  @return return a command that remove one token from the place
-    #
-    #---------------------------------------------------------------------------
-    def incNextToken(self):
-        return self.inc.eq(self.inc + 1)
-        
         
     #---------------------------------------------------------------------------
     ## Put one token into the place 
@@ -329,10 +333,9 @@ class Place():
     #---------------------------------------------------------------------------
     def putToken(self):
         return CmdList(
-            self.var.eq(self.var + self.inc),
-            self.inc.eq(0), 
+            self.var.eq(self.var + 1),
             If(self.var > self.capacity)(
-                Error(self.name + ' capacity was violated')
+                Fatal(self.name + ' capacity was violated')
             )
         )
         
@@ -393,9 +396,12 @@ class STG():
     #      any list respecting the same format is also valid
     #
     #---------------------------------------------------------------------------
-    def __init__(self, ast, sigMap = {"input"    : "input", 
-                                      "output"   : "output",
-                                      "internal" : "output"}):
+    def __init__(self, 
+                 ast, 
+                 sigMap,
+                 vddName, 
+                 vssName,
+                 rstName): 
 
         # Initialize local variables
         #-----------------------------------------------------------------------
@@ -404,19 +410,20 @@ class STG():
         self.transitions = {}
         self.markings    = {}
         self.capacity    = {}
-
+        self.dummies     = []
+        
         # verilogA module
         #-----------------------------------------------------------------------
         self.mod = HiLevelMod(ast["name"])
-        self.gnd = self.mod.electrical("GND", direction = "inout")
-        self.vdd = self.mod.electrical("VDD", direction = "inout")
+        self.gnd = self.mod.electrical(vssName, direction = "inout")
+        self.vdd = self.mod.electrical(vddName, direction = "inout")
         self.rf  = self.mod.par(1e-9, "RISE_FALL_PAR")
         self.dl  = self.mod.par(1e-9, "DELAY_PAR")
         self.inCap  = self.mod.par(10e-15, "IN_CAP_PAR")
         self.serRes = self.mod.par(100.00, "OUT_RES_PAR")
         self.rst = self.mod.dig(
                        domain = self.vdd, 
-                       name = "RST", 
+                       name = rstName, 
                        direction = "input", 
                        gnd = self.gnd,
                        inCap = self.inCap,
@@ -424,10 +431,11 @@ class STG():
         self.rstAt = At( Above(0.05 + self.rst.diffHalfDomain) )()
         self.mod.analog(self.rstAt)
         self.done = self.mod.var(0)
+        self.iter = self.mod.var(0)
         
         # Read all signals
         #-----------------------------------------------------------------------
-        for sigType in ["input", "output", "internal"]:
+        for sigType in ["input", "output"]:
             if sigType in ast:
                 for signalList in ast[sigType]:
                     assertList(signalList)
@@ -436,7 +444,7 @@ class STG():
                         assert not signal in self.signals, \
                                "Duplicated signal " + signal
                         par = 0
-                        if sigType != "input":
+                        if sigMap[sigType] == "output":
                             par = self.mod.par(0, signal + "_RST_VALUE_PAR")
                         digpin = self.mod.dig(
                                      domain = self.vdd, 
@@ -450,14 +458,28 @@ class STG():
                                      inCap = self.inCap,
                                      serRes = self.serRes
                                  )
-                        if sigMap[sigType] != "input":
+                        if sigMap[sigType] == "output":
                             self.rstAt.append(digpin.write(Bool(par)))
-                        if sigMap[sigType] == "internal":
-                            self.rstAt.append(digpin.lowZ())
                         self.signals[signal] = digpin     
-                        self.transitions[signal] = {"+":{}, "-":{}, "~":{}}      
+                        self.transitions[signal] = {"+":{}, "-":{}, "~":{}}   
+
+        # Read all dummies and internals (internals will be dummies)
+        #-----------------------------------------------------------------------
+        for dummyType in ["internal", "dummy"]:
+            if dummyType in ast:
+                for dummyList in ast[dummyType]:
+                    assertList(dummyList)
+                    for dummy in dummyList:
+                        assertStr(dummy)
+                        assert not dummy in self.dummies, \
+                            "Duplicated dummy " + dummy
+                        self.dummies.append(dummy)
+                        self.transitions[dummy] = {}                   
+                    
+        # Assert presence of inputs and outputs.
+        #-----------------------------------------------------------------------                                   
         assert len(self.signals) > 0, \
-               " There is no input, output, internal signals. Odd.."
+               " There is no input or output signals. Odd.."
 
         # Read capacity
         #-----------------------------------------------------------------------
@@ -526,7 +548,17 @@ class STG():
                   
         # build stg
         #-----------------------------------------------------------------------   
-        cmdOut = CmdList()                     
+        cmdOut = CmdList()    
+        for dummy in self.dummies:
+            for transition in self.transitions[dummy]:
+                transitionObj = self.transitions[dummy][transition]
+                cmdOut.append(
+                    If(transitionObj.isEnabled())( 
+                        transitionObj.fire(),
+                        self.done.eq(0)
+                    )  
+                )                    
+                             
         for signal in self.signals:
             signalObj = self.signals[signal]
             
@@ -553,38 +585,50 @@ class STG():
                         transitionObj = self.transitions[signal][edge][transition]
                         if edge == '+':
                             sigIfRising.append(True,
-                                transitionObj.putTokens(),    
-                            )
+                                If(transitionObj.isOnGoing())(
+                                    transitionObj.putTokens(), 
+                                    self.done.inc()       
+                                ),
+                            )  
                             cmdOut.append(
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
-                                    transitionObj.incNextTokens(),
-                                    signalObj.write(True) 
+                                    signalObj.write(True),
+                                    self.done.eq(0)
                                 )  
                             )
                         elif edge == '-':
                             sigIfFalling.append(True,
-                                transitionObj.putTokens(),    
-                            )
+                                If(transitionObj.isOnGoing())(
+                                    transitionObj.putTokens(), 
+                                    self.done.inc()       
+                                ),
+                            ) 
                             cmdOut.append(
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
-                                    transitionObj.incNextTokens(),
-                                    signalObj.write(False) 
+                                    signalObj.write(False),
+                                    self.done.eq(0) 
                                 )  
                             )
                         else:
                             sigIfRising.append(True,
-                                transitionObj.putTokens(),    
-                            )
+                                If(transitionObj.isOnGoing())(
+                                    transitionObj.putTokens(), 
+                                    self.done.inc()       
+                                ),
+                            ) 
                             sigIfFalling.append(True,
-                                transitionObj.putTokens(),    
-                            )
+                                If(transitionObj.isOnGoing())(
+                                    transitionObj.putTokens(), 
+                                    self.done.inc()       
+                                ),
+                            ) 
                             cmdOut.append(
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
-                                    transitionObj.incNextTokens(),
-                                    signalObj.toggle(False) 
+                                    signalObj.toggle(),
+                                    self.done.eq(0) 
                                 )  
                             )
             else:
@@ -594,41 +638,58 @@ class STG():
                         if edge in ['+', '~']:
                             sigIfRising.append(True,
                                 If(transitionObj.isEnabled())(
-                                    transitionObj.getTokens(),
-                                    transitionObj.incNextTokens(),
-                                    transitionObj.putTokens(), 
-                                    self.done.eq(1)       
+                                    transitionObj.fire(), 
+                                    self.done.inc()       
                                 ),
                             )  
                         if edge in ['-', '~']:
                             sigIfFalling.append(True,
                                 If(transitionObj.isEnabled())(
-                                    transitionObj.getTokens(),
-                                    transitionObj.incNextTokens(),
-                                    transitionObj.putTokens(), 
-                                    self.done.eq(1)       
+                                    transitionObj.fire(),
+                                    self.done.inc()       
                                 ),
                             )  
-                sigIfRising.append(True,
-                    If(self.done == 0)(
-                        Error("No transition related to " + \
-                              signal + \
-                              "+ is enabled")  
-                    )  
-                )
-                sigIfFalling.append(True,
-                    If(self.done == 0)(
-                        Error("No transition related to " + \
-                              signal + \
-                              "- is enabled")  
-                    )  
-                )
-        self.mod.analog(
-            If(self.rst.read())(
-                self.done.eq(0),  #dummy for no outputs     
-                cmdOut
+            sigIfRising.append(True,
+                If(self.done == 0)(
+                    Fatal("No transitions related to " + \
+                          signal + \
+                          "+ are enabled")  
+                ),  
+                If(self.done > 1)(
+                    Fatal("More than one transition fired for " + \
+                          signal  + \
+                          "+")  
+                )  
             )
-        )
+            sigIfFalling.append(True,
+                If(self.done == 0)(
+                    Fatal("No transitions related to " + \
+                          signal + \
+                          "- are enabled")  
+                ),
+                If(self.done > 1)(
+                    Fatal("More than one transition fired for " + \
+                          signal  + \
+                          "-")  
+                )  
+            )
+        
+        if len(cmdOut) > 0: 
+            self.mod.analog(
+                If(self.rst.read())(
+                    self.done.eq(0),
+                    self.iter.eq(0),
+                    While(~Bool(self.done))(
+                        self.iter.inc(),
+                        self.done.eq(1),
+                        cmdOut,
+                        If(self.iter > 500)(
+                            Fatal("STG seems to be stuck in a infinite loop " +\
+                                  "of dummy, internal or output transitions.")
+                        )
+                    )
+                )
+            )
                         
     #---------------------------------------------------------------------------
     ## match a place with an specific name   
@@ -648,10 +709,8 @@ class STG():
             if name in self.capacity.keys():
                 capacity = self.capacity[name]
             var = self.mod.var(marking)
-            inc = self.mod.var(0)
             self.rstAt.append(var.eq(marking))
             P = Place(var,
-                      inc,
                       name,
                       capacity)
             self.places[name] = P 
@@ -674,8 +733,16 @@ class STG():
                 if name in self.transitions[signame][sigEdge]:
                     TP = self.transitions[signame][sigEdge][name]
                 else:
-                    TP = Transition()
+                    var = self.mod.var(0)
+                    self.rstAt.append(var.eq(0))
+                    TP = Transition(var)
                     self.transitions[signame][sigEdge][name] = TP 
+            elif signame in self.dummies:
+                if name in self.transitions[signame]:
+                    TP = self.transitions[signame][name]
+                else:
+                    TP = Transition(None)
+                    self.transitions[signame][name] = TP
             else:
                 TP = self.matchPlace(name)
         else:
@@ -718,6 +785,27 @@ if __name__ == "__main__":
         help='output file name'
     )
     parser.add_argument(
+        '-vdd', 
+        action='store',
+        dest='vdd',
+        default='VDD',
+        help='VDD name'
+    )
+    parser.add_argument(
+        '-vss', 
+        action='store',
+        dest='vss',
+        default='VSS',
+        help='VSS name'
+    )
+    parser.add_argument(
+        '-rst', 
+        action='store',
+        dest='rst',
+        default='RST',
+        help='RST name'
+    )
+    parser.add_argument(
         '-seeInternals', 
         action='store_true',
         default=False,
@@ -754,7 +842,7 @@ if __name__ == "__main__":
         if results.allInp:
             mapping["output"] = "input"
 
-        stg = STG(ast, mapping)
+        stg = STG(ast, mapping, results.vdd, results.vss, results.rst)
         
         #Open log file
         f = open(results.outFile, "w")
