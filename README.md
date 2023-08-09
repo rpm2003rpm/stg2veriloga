@@ -39,7 +39,7 @@ stgToVerilogA relies on the assumptions of "consistency" and "deadlock freeness"
     python3 stgToVerilogA example/STG.g
 ```
 
-- stgToVerilogA isn't capable of inferring the initial states of the outputs. You need to set them manually through the parameters provided in the verilogA:
+- stgToVerilogA isn't capable of inferring the initial states of the outputs. You need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a transition becoming enabled and the output rise/fall edge) through the parameters:
 
 ![plot](./example/param.png)
 
