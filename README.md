@@ -29,7 +29,7 @@ or:
 
 ![plot](./example/stg.png)
 
-stgToVerilogA relies on the assumptions of "consistency" and "deadlock freeness", but it doesn't check these properties. Therefore, you must run these checks using [workcraft](https://workcraft.org/). The STG must also be deterministic, so you don't get wrong results.
+- stgToVerilogA relies on the assumptions of "consistency" and "deadlock freeness", but it doesn't check these properties. Therefore, you must run these checks using [workcraft](https://workcraft.org/). The STG must also be deterministic, so you don't get wrong results.
 
 - Once the STG is finished and passes the checks, you can export the STG to a .g file by clicking on "file" -> "Export" -> "Signal Transition Graph (*.g)". The result of these steps will be a file similar to the one provided in the example folder ([STG.g](./example/STG.g)).
 
@@ -39,15 +39,26 @@ stgToVerilogA relies on the assumptions of "consistency" and "deadlock freeness"
     python3 stgToVerilogA example/STG.g
 ```
 
-- stgToVerilogA isn't capable of inferring the initial states of the outputs. You need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a transition becoming enabled and the output rise/fall edge) through the parameters:
+- stgToVerilogA isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
 
 ![plot](./example/param.png)
 
-If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
 
 - The simulation result of this example is shown below:
 
 ![plot](./test/wave.png)
+
+# Errors 
+
+stgToVerilogA generates code to throw a fatal error during simulation whenever some inconsistency is detected. Check the simulation log to see what went wrong. 
+
+# Extra options
+
+Options to convert all signals to inputs, make the internal signals observable, and change some default names are available. You can check these options by typing:
+
+```
+    python3 stgToVerilogA -h 
+```
 
 
 

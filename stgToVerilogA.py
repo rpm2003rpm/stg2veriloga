@@ -411,6 +411,7 @@ class STG():
         self.markings    = {}
         self.capacity    = {}
         self.dummies     = []
+        sigMap['dummy'] = 'dummy'
         
         # verilogA module
         #-----------------------------------------------------------------------
@@ -435,46 +436,39 @@ class STG():
         
         # Read all signals
         #-----------------------------------------------------------------------
-        for sigType in ["input", "output"]:
+        for sigType in ["input", "output", "internal", "dummy"]:
             if sigType in ast:
                 for signalList in ast[sigType]:
                     assertList(signalList)
                     for signal in signalList:
                         assertStr(signal)
-                        assert not signal in self.signals, \
-                               "Duplicated signal " + signal
-                        par = 0
-                        if sigMap[sigType] == "output":
-                            par = self.mod.par(0, signal + "_RST_VALUE_PAR")
-                        digpin = self.mod.dig(
-                                     domain = self.vdd, 
-                                     name = signal,
-                                     value = par,
-                                     direction = sigMap[sigType],
-                                     delay = self.dl,
-                                     rise = self.rf,
-                                     fall = self.rf,
-                                     gnd = self.gnd,
-                                     inCap = self.inCap,
-                                     serRes = self.serRes
-                                 )
-                        if sigMap[sigType] == "output":
-                            self.rstAt.append(digpin.write(Bool(par)))
-                        self.signals[signal] = digpin     
-                        self.transitions[signal] = {"+":{}, "-":{}, "~":{}}   
-
-        # Read all dummies and internals (internals will be dummies)
-        #-----------------------------------------------------------------------
-        for dummyType in ["internal", "dummy"]:
-            if dummyType in ast:
-                for dummyList in ast[dummyType]:
-                    assertList(dummyList)
-                    for dummy in dummyList:
-                        assertStr(dummy)
-                        assert not dummy in self.dummies, \
-                            "Duplicated dummy " + dummy
-                        self.dummies.append(dummy)
-                        self.transitions[dummy] = {}                   
+                        if sigMap[sigType] == "input" or \
+                           sigMap[sigType] == "output":
+                            assert not signal in self.signals, \
+                                "Duplicated signal " + signal
+                            par = 0
+                            if sigMap[sigType] == "output":
+                                par = self.mod.par(0, signal + "_RST_VALUE_PAR")
+                            digpin = self.mod.dig(
+                                         domain = self.vdd, 
+                                         name = signal,
+                                         value = par,
+                                         direction = sigMap[sigType],
+                                         delay = self.dl,
+                                         rise = self.rf,
+                                         fall = self.rf,
+                                         gnd = self.gnd,
+                                         inCap = self.inCap,
+                                         serRes = self.serRes
+                                     )
+                            if sigMap[sigType] == "output":
+                                self.rstAt.append(digpin.write(Bool(par)))
+                            self.signals[signal] = digpin     
+                            self.transitions[signal] = {"+":{}, "-":{}, "~":{}}
+                        else:
+                            self.dummies.append(signal)
+                            self.transitions[signal] = {}     
+                                             
                     
         # Assert presence of inputs and outputs.
         #-----------------------------------------------------------------------                                   
