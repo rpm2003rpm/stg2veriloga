@@ -236,7 +236,7 @@ class Transition():
     #
     #---------------------------------------------------------------------------
     def isOnGoing(self):
-        return Bool(self.var)
+        return self.var
         
     #---------------------------------------------------------------------------
     ## get all the tokens from the incomming places
@@ -246,7 +246,7 @@ class Transition():
     #
     #---------------------------------------------------------------------------
     def getTokens(self):
-        ans = CmdList(self.var.eq(1))
+        ans = CmdList(self.var.eq(True))
         for fromItem in self.getFrom():
             ans.append(fromItem.getToken())
         return ans    
@@ -259,7 +259,7 @@ class Transition():
     #
     #---------------------------------------------------------------------------
     def putTokens(self):
-        ans = CmdList(self.var.eq(0))
+        ans = CmdList(self.var.eq(False))
         for toItem in self.getTo():
             ans.append(toItem.putToken())
         return ans   
@@ -593,7 +593,13 @@ class STG():
                             cmdOut.append(
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
-                                    signalObj.write(True),
+                                    If(signalObj.getST())(
+                                        Fatal(transition + \
+                                              " failed to trigger because " + \
+                                              signal + " is already high ")
+                                    ).Else(
+                                        signalObj.write(True)
+                                    ),
                                     self.done.eq(0)
                                 )  
                             )
@@ -607,7 +613,13 @@ class STG():
                             cmdOut.append(
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
-                                    signalObj.write(False),
+                                    If(signalObj.getST())(
+                                        signalObj.write(False)
+                                    ).Else(
+                                        Fatal(transition + \
+                                              " failed to trigger because " + \
+                                              signal + " is already low ")
+                                    ),
                                     self.done.eq(0) 
                                 )  
                             )
@@ -733,8 +745,8 @@ class STG():
                 if name in self.transitions[signame][sigEdge]:
                     TP = self.transitions[signame][sigEdge][name]
                 else:
-                    var = self.mod.var(0)
-                    self.rstAt.append(var.eq(0))
+                    var = self.mod.var(False)
+                    self.rstAt.append(var.eq(False))
                     TP = Transition(var)
                     self.transitions[signame][sigEdge][name] = TP 
             elif signame in self.dummies:
