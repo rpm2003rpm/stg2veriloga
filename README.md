@@ -14,13 +14,13 @@ The dependencies can be installed by typing the following command on a terminal:
 You can confirm that everything is working correctly by typing:
 
 ```
-    python3 stgToVeriloga -h 
+    python3 stgToVeriloga.py -h 
 ```
 
 or:
 
 ```
-    python3 stgToVeriloga example/STG.g
+    python3 stgToVeriloga.py example/STG.g
 ```
 
 # Example
@@ -36,7 +36,7 @@ or:
 - You can now convert the .g file to a veriloga model:
 
 ```
-    python3 stgToVeriloga example/STG.g
+    python3 stgToVeriloga.py example/STG.g
 ```
 
 - stgToVeriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
@@ -57,7 +57,7 @@ stgToVeriloga generates veriloga code to throw a fatal error during simulation w
 Options to convert all signals to inputs, make the internal signals observable, and change some default names are available. You can check these options by typing:
 
 ```
-    python3 stgToVeriloga -h 
+    python3 stgToVeriloga.py -h 
 ```
 
 
