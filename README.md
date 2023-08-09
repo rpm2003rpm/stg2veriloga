@@ -1,26 +1,26 @@
-# stgToVerilogA
+# stgToVeriloga
 
-Mixed signal IPs often require some sort of asynchronous logic. This logic can be modeled by means of Signal Transition Graphs (STG) with the [workcraft](https://workcraft.org/) tool. The purpose of stgToVerilogA is to convert a non-synthesizable STG into a veriloga model in order to help with the specification and initial validation of analog IPs that depend on asynchronous logic. 
+Mixed signal IPs often require some sort of asynchronous logic. This logic can be modeled by means of Signal Transition Graphs (STG) with the [workcraft](https://workcraft.org/) tool. The purpose of stgToVeriloga is to convert a non-synthesizable STG into a veriloga model in order to aid the specification and initial validation of analog IPs that depend on asynchronous logic. 
 
 # Dependencies 
 
-You will need to install [workcraft](https://workcraft.org/) and all the stgToVerilogA dependencies.
+You will need to install [workcraft](https://workcraft.org/) and all the stgToVeriloga dependencies.
 The dependencies can be installed by typing the following command on a terminal:
 
 ```
-    pip3 install -r requirements
+    pip3 install -r requirements.txt
 ```
 
 You can confirm that everything is working correctly by typing:
 
 ```
-    python3 stgToVerilogA -h 
+    python3 stgToVeriloga -h 
 ```
 
 or:
 
 ```
-    python3 stgToVerilogA example/STG.g
+    python3 stgToVeriloga example/STG.g
 ```
 
 # Example
@@ -29,17 +29,17 @@ or:
 
 ![plot](./example/stg.png)
 
-- stgToVerilogA relies on the assumptions of "consistency" and "deadlock freeness", but it doesn't check these properties. Therefore, you must run these checks using [workcraft](https://workcraft.org/). The STG must also be deterministic, so you don't get wrong results.
+- stgToVeriloga relies on the assumptions of "consistency" and "deadlock freeness", but it doesn't check these properties. Therefore, you must run these checks using [workcraft](https://workcraft.org/). The STG must also be deterministic, so you don't get wrong results.
 
 - Once the STG is finished and passes the checks, you can export the STG to a .g file by clicking on "file" -> "Export" -> "Signal Transition Graph (*.g)". The result of these steps will be a file similar to the one provided in the example folder ([STG.g](./example/STG.g)).
 
 - You can now convert the .g file to a veriloga model:
 
 ```
-    python3 stgToVerilogA example/STG.g
+    python3 stgToVeriloga example/STG.g
 ```
 
-- stgToVerilogA isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
+- stgToVeriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
 
 ![plot](./example/param.png)
 
@@ -50,14 +50,14 @@ or:
 
 # Errors 
 
-stgToVerilogA generates code to throw a fatal error during simulation whenever some inconsistency is detected. Check the simulation log to see what went wrong. 
+stgToVeriloga generates veriloga code to throw a fatal error during simulation whenever some inconsistency is detected. Check the simulation log to see what went wrong. 
 
 # Extra options
 
 Options to convert all signals to inputs, make the internal signals observable, and change some default names are available. You can check these options by typing:
 
 ```
-    python3 stgToVerilogA -h 
+    python3 stgToVeriloga -h 
 ```
 
 
