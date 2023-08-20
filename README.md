@@ -66,7 +66,7 @@ If you which to install the program in your computer, you can use setup tools to
 
 
 ```
-    pip3 install stgToVerilogA/
+    pip3 install stg2veriloga/
 ```
 
 Now you should have the command stg2veriloga available in your terminal.
