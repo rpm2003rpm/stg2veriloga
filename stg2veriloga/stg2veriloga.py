@@ -101,7 +101,7 @@ GRAMMAR = '''
 #
 #-------------------------------------------------------------------------------
 def assertStr(string):
-    assert isinstance(string, str), str(string) + " must be a string" 
+    assert isinstance(string, str), f"{string} must be a string" 
 
 
 #-------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def assertStr(string):
 #
 #-------------------------------------------------------------------------------
 def assertList(listInst):
-    assert isinstance(listInst, list), str(listInst) + " must be a list" 
+    assert isinstance(listInst, list), f"{listInst} must be a list" 
 
 
 #-------------------------------------------------------------------------------
@@ -121,7 +121,7 @@ def assertList(listInst):
 #
 #-------------------------------------------------------------------------------
 def assertInt(integer):
-    assert isinstance(integer, int), str(integer) + " must be an integer" 
+    assert isinstance(integer, int), f"{integer} must be an integer" 
 
 
 #-------------------------------------------------------------------------------
@@ -132,7 +132,7 @@ def assertInt(integer):
 #-------------------------------------------------------------------------------
 def assertPlace(place):
     assert isinstance(place, Place), \
-           "place must be an instance of the Place class" 
+           f"{place} must be an instance of the Place class" 
 
 
 #-------------------------------------------------------------------------------
@@ -143,7 +143,7 @@ def assertPlace(place):
 #-------------------------------------------------------------------------------
 def assertTransition(transition):
     assert isinstance(transition, Transition), \
-           "transition must be an instance of the Transition class" 
+           f"{transition} must be an instance of the Transition class" 
 
 
 #-------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ def assertTransition(transition):
 #
 #-------------------------------------------------------------------------------
 def assertEdge(edge):
-    assert edge in ['-', '+', '~'], "Unknown edge " + str(edge) 
+    assert edge in ['-', '+', '~'], f"Unknown edge {edge}" 
 
 
 #-------------------------------------------------------------------------------
@@ -335,7 +335,7 @@ class Place():
         return CmdList(
             self.var.eq(self.var + 1),
             If(self.var > self.capacity)(
-                Fatal(self.name + ' capacity was violated')
+                Fatal(f'{self.name} capacity was violated')
             )
         )
         
@@ -445,10 +445,10 @@ class STG():
                         if sigMap[sigType] == "input" or \
                            sigMap[sigType] == "output":
                             assert not signal in self.signals, \
-                                "Duplicated signal " + signal
+                                   f"Duplicated signal {signal}"
                             par = 0
                             if sigMap[sigType] == "output":
-                                par = self.mod.par(0, signal + "_RST_VALUE_PAR")
+                                par = self.mod.par(0, f"{signal}_RST_VALUE_PAR")
                             digpin = self.mod.dig(
                                          domain = self.vdd, 
                                          name = signal,
@@ -482,11 +482,11 @@ class STG():
                 assertList(capList)
                 for cap in capList:
                     assertList(cap)
-                    assert len(cap) == 2, str(cap) + \
-                           " capacity list must have two elements"
+                    assert len(cap) == 2, \
+                           f"{cap} capacity list must have two elements"
                     assertStr(cap[0])
                     assert not cap[0] in self.capacity.keys(), \
-                           "Duplicated capacity for signal " + cap[0]
+                           f"Duplicated capacity for signal {cap[0]}"
                     self.capacity[cap[0]] = int(cap[1]) 
 
         # Read markings
@@ -496,11 +496,11 @@ class STG():
                 assertList(markList)
                 for mark in markList:
                     assertList(mark)
-                    assert len(mark) == 2 or len(mark) == 1, str(mark) + \
-                           " marking list must have one or two elements"
+                    assert len(mark) == 2 or len(mark) == 1, \
+                           f"{mark} marking list must have one or two elements"
                     assertStr(mark[0])
                     assert not mark[0] in self.markings.keys(), \
-                           "Duplicated marking for signal " + mark[0]
+                           f"Duplicated marking for signal {mark[0]}"
                     if len(mark) < 2:
                         mark.append(1) 
                     self.markings[mark[0]] = int(mark[1]) 
@@ -524,8 +524,8 @@ class STG():
                 toTP = self.matchTP(toName)   
                 assert not (isinstance(toTP, Place) and \
                             isinstance(fromTP, Place)), \
-                       "There can't be arrow from place " + fromTPName +\
-                       " to place " + toTPName
+                     (f"There can't be arrow from place {fromTPName} to place "
+                      f"{toTPName}")
                 #Check if there is an implicit place
                 if isinstance(toTP, Transition) and \
                    isinstance(fromTP, Transition):
@@ -588,9 +588,9 @@ class STG():
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
                                     If(signalObj.getST())(
-                                        Fatal(transition + \
-                                              " failed to trigger because " + \
-                                              signal + " is already high ")
+                                        Fatal( (f"{transition} failed to trigger "
+                                                f"because {signal} is already "
+                                                 "high") )
                                     ).Else(
                                         signalObj.write(True)
                                     ),
@@ -610,9 +610,9 @@ class STG():
                                     If(signalObj.getST())(
                                         signalObj.write(False)
                                     ).Else(
-                                        Fatal(transition + \
-                                              " failed to trigger because " + \
-                                              signal + " is already low ")
+                                        Fatal( (f"{transition} failed to trigger "
+                                                f"because {signal} is already "
+                                                 "low") )
                                     ),
                                     self.done.eq(0) 
                                 )  
@@ -657,26 +657,18 @@ class STG():
                             )  
             sigIfRising.append(True,
                 If(self.done == 0)(
-                    Fatal("No transitions related to " + \
-                          signal + \
-                          "+ are enabled")  
+                    Fatal(f"No transitions related to {signal}+ are enabled")
                 ),  
                 If(self.done > 1)(
-                    Fatal("More than one transition fired for " + \
-                          signal  + \
-                          "+")  
+                    Fatal(f"More than one transition fires for {signal}+")
                 )  
             )
             sigIfFalling.append(True,
                 If(self.done == 0)(
-                    Fatal("No transitions related to " + \
-                          signal + \
-                          "- are enabled")  
+                   Fatal(f"No transitions related to {signal}- are enabled")
                 ),
                 If(self.done > 1)(
-                    Fatal("More than one transition fired for " + \
-                          signal  + \
-                          "-")  
+                    Fatal(f"More than one transition fires for {signal}-")
                 )  
             )
         
@@ -690,8 +682,8 @@ class STG():
                         self.done.eq(1),
                         cmdOut,
                         If(self.iter > 500)(
-                            Fatal("STG seems to be stuck in a infinite loop " +\
-                                  "of dummy, internal or output transitions.")
+                            Fatal(("STG seems to be stuck in a infinite loop "
+                                   "of dummy, internal or output transitions.")) 
                         )
                     )
                 )
@@ -715,10 +707,10 @@ class STG():
             if name in self.capacity.keys():
                 capacity = self.capacity[name]
             var = self.mod.var(value = marking, 
-                               name = f"P_{name}".replace(",", "_").\
-                                                  replace("+", "_$p$").\
-                                                  replace("-", "_$m$").\
-                                                  replace("/", "_$b$"))
+                               name = f"P_{name}".replace(",", "$$").\
+                                                  replace("+", "$p").\
+                                                  replace("-", "$m").\
+                                                  replace("/", "$"))
             self.rstAt.append(var.eq(marking))
             P = Place(var,
                       name,
@@ -745,9 +737,9 @@ class STG():
                 else:
                     if not isinstance(self.signals[signame], hilevelmod.DigIn):
                         var = self.mod.var(value = False,
-                                           name = f"T_{name}".replace("/", "_$b$").\
-                                                              replace("+", "_$p$").\
-                                                              replace("-", "_$m$"))
+                                           name = f"T_{name}".replace("/", "$").\
+                                                              replace("+", "$p").\
+                                                              replace("-", "$m"))
                         self.rstAt.append(var.eq(False))
                         TP = Transition(var)
                     else:
@@ -780,7 +772,7 @@ class STG():
 ## Main
 #
 #-------------------------------------------------------------------------------
-if __name__ == "__main__":
+def cli():
 
     #---------------------------------------------------------------------------
     # Input arguments
@@ -833,8 +825,8 @@ if __name__ == "__main__":
         action='store_true',
         default=False,
         dest='allInp',
-        help='Convert all signals into inputs. If seeInternals is enabled, ' +\
-             'internal signals will also be converted to inputs.'
+        help=('Convert all signals into inputs. If seeInternals is enabled, '
+              'internal signals will also be converted to inputs.')
     )     
     results = parser.parse_args()
 
@@ -873,3 +865,9 @@ if __name__ == "__main__":
     # Success
     #---------------------------------------------------------------------------
     exit(0)
+
+
+
+if __name__ == "__main__":
+    cli()
+
