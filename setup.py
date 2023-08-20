@@ -29,10 +29,16 @@
 from setuptools import setup, find_packages
 
 setup(
-    entry_points = { 'console_scripts' : ['stg2veriloga=stg2veriloga.stg2veriloga:cli'] },
+    entry_points = {'console_scripts' : ['stg2veriloga=stg2veriloga.stg2veriloga:cli'] },
     name='stg2veriloga',
     version='1.1',
     packages=find_packages(),
+    install_requires=[
+        'argparse>=1.4.0',
+        'regex>=2023.6.3',
+        'grako>=3.99.9',
+        'vagen @ git+https://github.com/rpm2003rpm/vagen@main',
+    ]
 )
 
 
