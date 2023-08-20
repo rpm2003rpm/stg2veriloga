@@ -431,8 +431,8 @@ class STG():
                    )
         self.rstAt = At( Above(0.05 + self.rst.diffHalfDomain) )()
         self.mod.analog(self.rstAt)
-        self.done = self.mod.var(0)
-        self.iter = self.mod.var(0)
+        self.done = self.mod.var(value = 0, name = "_$done")
+        self.iter = self.mod.var(value = 0, name = "_$counter")
         
         # Read all signals
         #-----------------------------------------------------------------------
@@ -714,7 +714,11 @@ class STG():
                 marking = self.markings[name]
             if name in self.capacity.keys():
                 capacity = self.capacity[name]
-            var = self.mod.var(marking)
+            var = self.mod.var(value = marking, 
+                               name = f"P_{name}".replace(",", "_").\
+                                                  replace("+", "_$p$").\
+                                                  replace("-", "_$m$").\
+                                                  replace("/", "_$b$"))
             self.rstAt.append(var.eq(marking))
             P = Place(var,
                       name,
@@ -739,9 +743,15 @@ class STG():
                 if name in self.transitions[signame][sigEdge]:
                     TP = self.transitions[signame][sigEdge][name]
                 else:
-                    var = self.mod.var(False)
-                    self.rstAt.append(var.eq(False))
-                    TP = Transition(var)
+                    if not isinstance(self.signals[signame], hilevelmod.DigIn):
+                        var = self.mod.var(value = False,
+                                           name = f"T_{name}".replace("/", "_$b$").\
+                                                              replace("+", "_$p$").\
+                                                              replace("-", "_$m$"))
+                        self.rstAt.append(var.eq(False))
+                        TP = Transition(var)
+                    else:
+                        TP = Transition(None)
                     self.transitions[signame][sigEdge][name] = TP 
             elif signame in self.dummies:
                 if name in self.transitions[signame]:
