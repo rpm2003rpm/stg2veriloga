@@ -429,7 +429,7 @@ class STG():
                        gnd = self.gnd,
                        inCap = self.inCap,
                    )
-        self.rstAt = At( Above(0.05 + self.rst.diffHalfDomain) )()
+        self.rstAt = At( Cross(self.rst.diffHalfDomain + 0.05, "falling") )()
         self.mod.analog(self.rstAt)
         self.done = self.mod.var(value = 0, name = "_$done")
         self.iter = self.mod.var(value = 0, name = "_$counter")
