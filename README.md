@@ -39,7 +39,7 @@ or:
     python3 stg2veriloga/stg2veriloga.py  example/STG.g
 ```
 
-- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the simulation will eventually throw a fatal error and stop.
+- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the internal variable "STG_ERROR" will be eventually set and messages related to the problem will apear on the simulation log.
 
 ![plot](./example/param.png)
 
@@ -50,7 +50,7 @@ or:
 
 # Errors 
 
-stg2veriloga generates veriloga code to throw a fatal error during simulation whenever some inconsistency is detected. Check the simulation log to see what went wrong. 
+stg2veriloga sets the internal variable STG_ERROR whenever some inconsistency is detected. Check the simulation log to see what went wrong. Initially, I planned to use the $fatal task but it didn't work due to the way the simulator works. 
 
 # Extra options
 

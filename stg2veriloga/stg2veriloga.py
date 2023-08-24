@@ -34,8 +34,8 @@
 #-------------------------------------------------------------------------------
 import argparse
 import re
-from vagen import If, While, Bool, HiLevelMod, At, \
-                  Above, Cross, CmdList, Fatal, hilevelmod
+from vagen import If, While, Bool, HiLevelMod, At, Fatal, \
+                  Above, Cross, CmdList, Strobe, hilevelmod
 from grako import parse
 
 
@@ -295,13 +295,14 @@ class Place():
     #  @param capacity capacity of the place
     #
     #---------------------------------------------------------------------------
-    def __init__(self, var, name, capacity = 1):
+    def __init__(self, var, errVar, name, capacity = 1):
         assertInt(capacity)
         self.capacity = capacity
         self.toTransitions = []
         self.fromTransitions = []
         self.var = var
         self.name = name
+        self.errVar = errVar
         
     #---------------------------------------------------------------------------
     ## Check if the place has tokens
@@ -335,7 +336,8 @@ class Place():
         return CmdList(
             self.var.eq(self.var + 1),
             If(self.var > self.capacity)(
-                Fatal(f'{self.name} capacity was violated')
+                Strobe(f'{self.name} capacity was violated'),
+                self.errVar.eq(True)
             )
         )
         
@@ -422,6 +424,7 @@ class STG():
         self.dl  = self.mod.par(1e-9, "DELAY_PAR")
         self.inCap  = self.mod.par(10e-15, "IN_CAP_PAR")
         self.serRes = self.mod.par(100.00, "OUT_RES_PAR")
+        self.errVar = self.mod.var(name = "STG_ERROR", value = False)
         self.rst = self.mod.dig(
                        domain = self.vdd, 
                        name = rstName, 
@@ -436,7 +439,7 @@ class STG():
         
         # Read all signals
         #-----------------------------------------------------------------------
-        for sigType in ["input", "output", "internal", "dummy"]:
+        for sigType in ["output", "input", "internal", "dummy"]:
             if sigType in ast:
                 for signalList in ast[sigType]:
                     assertList(signalList)
@@ -588,9 +591,10 @@ class STG():
                                 If(transitionObj.isEnabled())( 
                                     transitionObj.getTokens(),
                                     If(signalObj.getST())(
-                                        Fatal( (f"{transition} failed to trigger "
-                                                f"because {signal} is already "
-                                                 "high") )
+                                        Strobe( (f"{transition} failed to trigger "
+                                                 f"because {signal} is already "
+                                                  "high") ),
+                                        self.errVar.eq(True)
                                     ).Else(
                                         signalObj.write(True)
                                     ),
@@ -610,9 +614,10 @@ class STG():
                                     If(signalObj.getST())(
                                         signalObj.write(False)
                                     ).Else(
-                                        Fatal( (f"{transition} failed to trigger "
-                                                f"because {signal} is already "
-                                                 "low") )
+                                        Strobe( (f"{transition} failed to trigger "
+                                                 f"because {signal} is already "
+                                                  "low") ),
+                                        self.errVar.eq(True)
                                     ),
                                     self.done.eq(0) 
                                 )  
@@ -657,18 +662,22 @@ class STG():
                             )  
             sigIfRising.append(True,
                 If(self.done == 0)(
-                    Fatal(f"No transitions related to {signal}+ are enabled")
+                    Strobe(f"No transitions related to {signal}+ are enabled"),
+                    self.errVar.eq(True)
                 ),  
                 If(self.done > 1)(
-                    Fatal(f"More than one transition fires for {signal}+")
+                    Strobe(f"More than one transition fires for {signal}+"),
+                    self.errVar.eq(True)
                 )  
             )
             sigIfFalling.append(True,
                 If(self.done == 0)(
-                   Fatal(f"No transitions related to {signal}- are enabled")
+                    Strobe(f"No transitions related to {signal}- are enabled"),
+                    self.errVar.eq(True)
                 ),
                 If(self.done > 1)(
-                    Fatal(f"More than one transition fires for {signal}-")
+                    Strobe(f"More than one transition fires for {signal}-"),
+                    self.errVar.eq(True)
                 )  
             )
         
@@ -713,6 +722,7 @@ class STG():
                                                   replace("/", "$"))
             self.rstAt.append(var.eq(marking))
             P = Place(var,
+                      self.errVar,
                       name,
                       capacity)
             self.places[name] = P 
