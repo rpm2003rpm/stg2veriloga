@@ -34,7 +34,7 @@
 #-------------------------------------------------------------------------------
 import argparse
 import re
-from vagen import If, While, Bool, HiLevelMod, At, Fatal, \
+from vagen import If, While, Bool, HiLevelMod, At, Fatal, Branch, \
                   Above, Cross, CmdList, Strobe, hilevelmod
 from grako import parse
 
@@ -432,7 +432,7 @@ class STG():
                        gnd = self.gnd,
                        inCap = self.inCap,
                    )
-        self.rstAt = At( Cross(self.rst.diffHalfDomain + 0.05, "falling") )()
+        self.rstAt = At( Cross(self.rst.diffHalfDomain + 1e-3, "both") )()
         self.mod.analog(self.rstAt)
         self.done = self.mod.var(value = 0, name = "_$done")
         self.iter = self.mod.var(value = 0, name = "_$counter")
@@ -561,10 +561,12 @@ class STG():
             
             # Process signals
             #-------------------------------------------------------------------
-            sigIfRising  = If(self.rst.read())(
+            sigIfRising  = If(self.rst.read() & 
+                              (Branch(self.vdd, self.gnd).v > 0.1))(
                                self.done.eq(0)
                            )
-            sigIfFalling = If(self.rst.read())(
+            sigIfFalling = If(self.rst.read() & 
+                              (Branch(self.vdd, self.gnd).v > 0.1))(
                                self.done.eq(0)
                            )
             self.mod.analog(
@@ -683,7 +685,8 @@ class STG():
         
         if len(cmdOut) > 0: 
             self.mod.analog(
-                If(self.rst.read())(
+                If(self.rst.read() & 
+                   (Branch(self.vdd, self.gnd).v > 0.1))(
                     self.done.eq(0),
                     self.iter.eq(0),
                     While(~Bool(self.done))(
