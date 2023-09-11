@@ -420,10 +420,10 @@ class STG():
         self.mod = HiLevelMod(ast["name"])
         self.gnd = self.mod.electrical(vssName, direction = "inout")
         self.vdd = self.mod.electrical(vddName, direction = "inout")
-        self.rf  = self.mod.par(1e-9, "RISE_FALL_PAR")
-        self.dl  = self.mod.par(1e-9, "DELAY_PAR")
+        self.rf  = self.mod.par(100e-12, "RISE_FALL_PAR")
+        self.dl  = self.mod.par(100e-12, "DELAY_PAR")
         self.inCap  = self.mod.par(10e-15, "IN_CAP_PAR")
-        self.serRes = self.mod.par(100.00, "OUT_RES_PAR")
+        self.serRes = self.mod.par(10e3, "OUT_RES_PAR")
         self.errVar = self.mod.var(name = "STG_ERROR", value = False)
         self.rst = self.mod.dig(
                        domain = self.vdd, 
