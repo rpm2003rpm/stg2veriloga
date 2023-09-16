@@ -37,7 +37,7 @@ setup(
         'argparse>=1.4.0',
         'regex>=2023.6.3',
         'grako>=3.99.9',
-        'vagen @ git+https://github.com/rpm2003rpm/vagen@main',
+        'vagen',
     ]
 )
 
