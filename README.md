@@ -31,7 +31,7 @@ or:
 
 - stg2veriloga relies on the assumptions of "consistency" and "deadlock freeness", but it doesn't check these properties. Therefore, you must run these checks using [workcraft](https://workcraft.org/). The STG must also be deterministic, so you don't get wrong results.
 
-- Once the STG is finished and passes the checks, you can export the STG to a .g file by clicking on "file" -> "Export" -> "Signal Transition Graph (*.g)". The result of these steps will be a file similar to the one provided in the example folder ([STG.g](./example/STG.g)).
+- Once the STG is finished and passes the checks, you can export the STG to a .g file by clicking on "file" -> "Export" -> "Signal Transition Graph (*.g)". The result of these steps is a file similar to the one provided in the example folder ([STG.g](./example/STG.g)).
 
 - You can now convert the .g file to a veriloga model:
 
@@ -39,7 +39,7 @@ or:
     python3 stg2veriloga/stg2veriloga.py  example/STG.g
 ```
 
-- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the internal variable "STG_ERROR" will be eventually set and messages related to the problem will apear on the simulation log.
+- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between an output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the internal variable "STG_ERROR" will be set eventually and messages related to the problem will apear in the simulation log.
 
 ![plot](./example/param.png)
 
