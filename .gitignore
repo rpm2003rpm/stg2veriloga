@@ -1,1 +1,3 @@
 *.va
+build
+stg2veriloga.egg-info

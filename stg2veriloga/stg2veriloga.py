@@ -36,7 +36,7 @@ import argparse
 import re
 from vagen import If, While, Bool, HiLevelMod, At, Fatal, Branch, \
                   Above, Cross, CmdList, Strobe, hilevelmod
-from grako import parse
+from tatsu import compile
 
 
 #-------------------------------------------------------------------------------
@@ -45,9 +45,12 @@ from grako import parse
 #-------------------------------------------------------------------------------
 GRAMMAR = '''
 
-    @@eol_comments :: /#.*?$\\n/
-    @@whitespace :: /[\t ]+/
+
     @@grammar::Calc
+
+    @@whitespace::/[\t ]+/
+
+    @@eol_comments :: /#[^\n]*\n/
 
     start   = stg $ ;
 
@@ -83,13 +86,13 @@ GRAMMAR = '''
  
     implicit  = '<' @+:tranPlaceComma '>' ['=' @+:value];
      
-    name      = /[a-zA-Z_][a-zA-Z_0-9.]*/;
+    name      = /[a-zA-Z_][a-zA-Z_0-9]*/;
 
-    value     = /[0-9]*/;
+    value     = /[0-9]+/;
 
-    tranPlace = ?/[a-zA-Z_][a-zA-Z_0-9\+\-\~/.]*/?;
+    tranPlace = ?/[a-zA-Z_][a-zA-Z_0-9\+\-\~/]*/?;
 
-    tranPlaceComma = ?/[a-zA-Z_][a-zA-Z_0-9\+\-\~/.]*,[a-zA-Z_][a-zA-Z_0-9\+\-\~/.]*/?;
+    tranPlaceComma = ?/[a-zA-Z_][a-zA-Z_0-9\+\-\~/]*,[a-zA-Z_][a-zA-Z_0-9\+\-\~/]*/?;
 
 '''
 
@@ -394,7 +397,7 @@ class STG():
     ## Constructor
     #
     #  @param ast abstract syntax tree representing the petri net (parsed from 
-    #      .g file by the grako with the grammar defined by GRAMMAR). However, 
+    #      .g file by the tatsu with the grammar defined by GRAMMAR). However, 
     #      any list respecting the same format is also valid
     #
     #---------------------------------------------------------------------------
@@ -489,7 +492,7 @@ class STG():
             for capList in ast["capacity"]:
                 assertList(capList)
                 for cap in capList:
-                    assertList(cap)
+                    cap = list(cap)
                     assert len(cap) == 2, \
                            f"{cap} capacity list must have two elements"
                     assertStr(cap[0])
@@ -503,7 +506,7 @@ class STG():
             for markList in ast["marking"]:
                 assertList(markList)
                 for mark in markList:
-                    assertList(mark)
+                    mark = list(mark)
                     assert len(mark) == 2 or len(mark) == 1, \
                            f"{mark} marking list must have one or two elements"
                     assertStr(mark[0])
@@ -856,7 +859,8 @@ def cli():
         with open(results.stg[0]) as content_file:
             content = content_file.read()
         #Create stg
-        ast = parse(GRAMMAR, content)
+        model = compile(GRAMMAR)
+        ast = model.parse(content)
         mapping = {"input"    : "input", 
                    "output"   : "output",
                    "internal" : "internal"}

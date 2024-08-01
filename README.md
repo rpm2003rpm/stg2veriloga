@@ -39,7 +39,7 @@ or:
     python3 stg2veriloga/stg2veriloga.py  example/STG.g
 ```
 
-- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the internal variable "STG_ERROR" will be eventually set and messages related to the problem will apear on the simulation log.
+- stg2veriloga isn't capable of inferring the initial states of the outputs. Therefore, you need to set them manually through the parameters provided in the verilogA. You can also set the input capacitance, output resistance, rise time, fall time, and delay (the interval between a output transition becoming enabled and the output rise/fall edge) through the parameters. If the initial output states are wrong, the internal variable "STG_ERROR" will eventually be set and messages related to the problem will apear on the simulation log.
 
 ![plot](./example/param.png)
 
@@ -62,7 +62,7 @@ Options to convert all signals to inputs, make the internal signals observable, 
 
 # Setup tools
 
-If you which to install the program in your computer, you can use setup tools to install it. Go one directory above this one and type:
+If you which to install the program in your computer, go one directory above this one and type:
 
 
 ```
