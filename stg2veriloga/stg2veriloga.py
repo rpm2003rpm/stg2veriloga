@@ -406,7 +406,8 @@ class STG():
                  sigMap,
                  vddName, 
                  vssName,
-                 rstName): 
+                 rstName,
+                 seeError): 
 
         # Initialize local variables
         #-----------------------------------------------------------------------
@@ -444,7 +445,19 @@ class STG():
         )
         self.done = self.mod.var(value = 0, name = "_$done")
         self.iter = self.mod.var(value = 0, name = "_$counter")
-        
+
+        if seeError:
+            self.errorPin = self.mod.dig(
+                domain = self.vdd, 
+                name = "__STG_ERROR__",
+                value = False,
+                direction = 'output',
+                delay = 0,
+                rise = 1e-12,
+                fall = 1e-12,
+                gnd = self.gnd
+            )
+       
         # Read all signals
         #-----------------------------------------------------------------------
         for sigType in ["output", "input", "internal", "dummy"]:
@@ -708,7 +721,9 @@ class STG():
                     )
                 )
             )
-                        
+        if seeError:
+            self.mod.analog(self.errorPin.write(self.errVar))
+                       
     #---------------------------------------------------------------------------
     ## match a place with an specific name   
     #  
@@ -842,6 +857,13 @@ def cli():
         help='Internal signals will be converted into in/out ports.'
     ) 
     parser.add_argument(
+        '-seeError', 
+        action='store_true',
+        default=False,
+        dest='seeError',
+        help='See error signal.'
+    ) 
+    parser.add_argument(
         '-allInputs', 
         action='store_true',
         default=False,
@@ -872,7 +894,7 @@ def cli():
         if results.allInp:
             mapping["output"] = "input"
 
-        stg = STG(ast, mapping, results.vdd, results.vss, results.rst)
+        stg = STG(ast, mapping, results.vdd, results.vss, results.rst, results.seeError)
         
         #Open log file
         f = open(results.outFile, "w")
